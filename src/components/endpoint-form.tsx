@@ -46,6 +46,10 @@ function buildModelsUrl(rawUrl: string, provider: ProviderId): string {
   }
 }
 
+function isDefaultProviderUrl(url: string): boolean {
+  return PROVIDERS.some((provider) => provider.defaultUrl === url);
+}
+
 export function EndpointForm({ compact }: Props) {
   const { t } = useI18n();
   const { setResult, addHistory, lastUrl } = useAppStore();
@@ -107,9 +111,15 @@ export function EndpointForm({ compact }: Props) {
   });
 
   const onProviderChange = (p: ProviderId) => {
-    setProvider(p);
     const def = getProvider(p);
-    if (def.defaultUrl && (!url || url === lastUrl)) setUrl(def.defaultUrl);
+    setProvider(p);
+    setMethod("GET");
+
+    if (def.defaultUrl) {
+      setUrl(def.defaultUrl);
+    } else if (isDefaultProviderUrl(url)) {
+      setUrl("");
+    }
   };
 
   return (
@@ -121,20 +131,40 @@ export function EndpointForm({ compact }: Props) {
       className="space-y-4"
     >
       <div className={compact ? "grid gap-4 md:grid-cols-12" : "grid gap-4 md:grid-cols-2"}>
-        <div className={compact ? "md:col-span-5" : ""}>
+        {compact && (
+          <div className="md:col-span-3">
+            <Label className="text-xs text-muted-foreground mb-2 block">{t("form.endpoint")}</Label>
+            <Select value={provider} onValueChange={(v) => onProviderChange(v as ProviderId)}>
+              <SelectTrigger className="bg-background/40 border-white/10 h-11">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {PROVIDERS.map((p) => (
+                  <SelectItem key={p.id} value={p.id}>
+                    {p.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
+        {(!compact || provider === "custom") && (
+        <div className={compact ? "md:col-span-4" : ""}>
           <Label className="text-xs text-muted-foreground mb-2 block">{t("form.url")}</Label>
           <Input
             value={url}
             onChange={(e) => {
               setUrl(e.target.value);
-              setProvider(detectProvider(e.target.value));
+              if (!compact) setProvider(detectProvider(e.target.value));
             }}
-            placeholder="https://api.openai.com/v1/models"
+            placeholder={provider === "custom" ? "https://api.provider.com/v1" : "https://api.openai.com/v1/models"}
             className="bg-background/40 border-white/10 h-11"
             required
           />
         </div>
-        <div className={compact ? "md:col-span-2" : ""}>
+        )}
+        {!compact && (
+        <div>
           <Label className="text-xs text-muted-foreground mb-2 block">{t("form.method")}</Label>
           <Select value={method} onValueChange={(v) => setMethod(v as "GET" | "POST")}>
             <SelectTrigger className="bg-background/40 border-white/10 h-11">
@@ -146,6 +176,7 @@ export function EndpointForm({ compact }: Props) {
             </SelectContent>
           </Select>
         </div>
+        )}
         <div className={compact ? "md:col-span-3" : ""}>
           <Label className="text-xs text-muted-foreground mb-2 block">{t("form.apikey")}</Label>
           <div className="relative">
